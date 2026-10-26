@@ -73,6 +73,63 @@ print(camera.is_learned(1), camera.has_id(1))
 - `camera.results`, `camera.blocks`, `camera.arrows`: resultados **da última leitura bem-sucedida**. Limpos ao início de cada nova consulta.
 - `ID == 0`: detecção ainda não aprendida.
 
+## Referência rápida de todas as funções
+
+Esta seção resume a **API pública** de `huskylens.py`. Os métodos de leitura consultam a câmera quando indicado; já os contadores e verificações locais usam os dados da **última consulta**.
+
+### Inicialização e comunicação
+
+| Função | Explicação rápida |
+|---|---|
+| `HuskyLens(...)` | Cria a conexão UART ou I²C. Aceita pinos, identificador da interface, `timeout`, `retries`, endereço I²C e objetos `uart`/`i2c` já configurados. |
+| `ping()` | Envia um teste de comunicação; retorna `True` se receber a resposta esperada e `False` se ocorrer erro de comunicação tratado pelo driver. |
+| `set_algorithm(nome_ou_numero)` | Seleciona um dos sete algoritmos (nome ou número de 0 a 6). |
+| `HuskyLens.pack(comando, payload=b'')` | Monta um pacote do protocolo com cabeçalho, comando, dados e checksum; útil para diagnóstico. |
+| `raw_command(comando, payload=b'')` | Envia um comando de baixo nível e devolve `(comando_da_resposta, dados_em_bytes)`. Para uso avançado. |
+
+### Leitura de resultados
+
+| Função | Explicação rápida |
+|---|---|
+| `request(kind='all', object_id=None)` | Consulta detecções e atualiza `results`, `blocks`, `arrows`, `frame` e `learned_count`. Tipos: `all`, `blocks`, `arrows`, `learned`, `learned_blocks`, `learned_arrows`. O filtro por ID só vale para `all`, `blocks` e `arrows`. |
+| `get_blocks(object_id=None)` | Consulta a câmera e retorna os blocos detectados; opcionalmente filtra por ID. |
+| `get_arrows(object_id=None)` | Consulta a câmera e retorna os vetores de linha; opcionalmente filtra por ID. |
+| `get_learned()` | Consulta e retorna as detecções associadas a IDs aprendidos. |
+| `get_learned_blocks()` | Consulta e retorna apenas blocos de IDs aprendidos. |
+| `get_learned_arrows()` | Consulta e retorna apenas vetores de IDs aprendidos. |
+| `count()` | Conta todos os resultados armazenados da última consulta. Não consulta a câmera novamente. |
+| `count_blocks()` | Conta os blocos armazenados da última consulta. |
+| `count_arrows()` | Conta os vetores armazenados da última consulta. |
+| `is_learned(object_id=None)` | Verifica os metadados da última consulta: sem ID, se há algum ID aprendido; com ID, se ele está dentro da contagem informada pela câmera. **Não confirma sozinho que o ID foi detectado.** |
+| `has_id(object_id)` | Verifica se um resultado da última consulta possui esse ID. Não consulta a câmera novamente. |
+
+### Aprendizagem, tela e armazenamento
+
+| Função | Explicação rápida |
+|---|---|
+| `learn(object_id)` | Solicita que a câmera aprenda o objeto atual com o ID informado. |
+| `forget()` | Apaga os IDs aprendidos do algoritmo atualmente selecionado na câmera. |
+| `set_custom_name(object_id, name)` | Define um nome ASCII de até 20 caracteres para um ID (1 a 255). |
+| `custom_text(text, x=0, y=0)` | Exibe texto ASCII de até 20 caracteres sobre a imagem, nas coordenadas indicadas. |
+| `clear_text()` | Remove os textos personalizados exibidos na tela da câmera. |
+| `save_photo()` | Solicita o salvamento de uma foto no cartão microSD **da câmera**; não envia pixels ao microcontrolador. |
+| `save_screenshot()` | Solicita o salvamento de uma captura da tela/interface no microSD da câmera. |
+| `save_model(slot=1)` | Salva no microSD o modelo aprendido do algoritmo atual, no slot informado. |
+| `load_model(slot=1)` | Carrega do microSD um modelo anteriormente salvo no slot informado. |
+| `is_pro()` | Verifica se a câmera se identifica como modelo Pro, quando o firmware oferece suporte a esse comando. |
+| `firmware_handshake(expected_version)` | **Experimental:** envia uma versão esperada para verificar a resposta do firmware; **não** descobre a versão instalada nem atualiza o firmware. |
+
+### Dados, atributos e erros
+
+- `Block`: detecção retangular com `x`, `y` (centro), `width`, `height`, `id`; aliases `x_center` e `y_center`.
+- `Arrow`: vetor de linha com `x_origin`, `y_origin`, `x_target`, `y_target` e `id`.
+- `camera.results`, `camera.blocks`, `camera.arrows`: listas da última consulta bem-sucedida; `camera.frame` e `camera.learned_count` são metadados dessa consulta.
+- `camera.algorithm`: último algoritmo definido **pelo driver**; não lê a seleção atual diretamente da câmera.
+- `camera.bad_checksums`: total de pacotes recebidos com checksum inválido; `camera.last_command` e `camera.last_payload` guardam a última resposta válida recebida.
+- Exceções: `HuskyLensError` (protocolo/comunicação), `HuskyLensTimeout` (sem resposta completa), `HuskyLensBusy` (câmera ocupada após tentativas) e `HuskyLensNeedPro` (comando exige modelo Pro).
+
+**Observação:** os comandos avançados de texto, microSD e Pro dependem do firmware e devem ser validados com uma câmera física.
+
 ## Aprendizagem, interface e microSD
 
 | Método | Efeito | Comando |
