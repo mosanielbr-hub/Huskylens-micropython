@@ -8,7 +8,7 @@ The device does not expose raw camera frames through this protocol.
 from machine import Pin, UART, I2C
 from time import ticks_ms, ticks_diff, sleep_ms
 
-__version__ = '1.0.0-rc1'
+__version__ = '1.0.0-rc2'
 
 ALGORITHMS = {
     'FACE_RECOGNITION': 0,
@@ -252,7 +252,10 @@ class HuskyLens:
         buf = self._rx
         while len(buf) >= 3:
             if buf[0:3] != _HEADER:
-                del buf[0]
+                # MicroPython bytearray may not support item deletion.
+                # Rebind the unread suffix instead of using `del`.
+                buf = buf[1:]
+                self._rx = buf
                 continue
             if len(buf) < 6:
                 return None
@@ -262,11 +265,13 @@ class HuskyLens:
                 return None
             if (sum(buf[:full - 1]) & 0xFF) != buf[full - 1]:
                 self.bad_checksums += 1
-                del buf[0]  # search next header; keep possible embedded packet
+                # Search next header without bytearray item deletion.
+                buf = buf[1:]
+                self._rx = buf
                 continue
             command = buf[4]
             payload = bytes(buf[5:full - 1])
-            del buf[:full]
+            self._rx = buf[full:]
             return command, payload
         return None
 
@@ -284,7 +289,7 @@ class HuskyLens:
                 self._rx.extend(new)
                 # Bound buffering for broken/noisy link. Keep plausible tails.
                 if len(self._rx) > 768:
-                    del self._rx[:-260]
+                    self._rx = self._rx[-260:]
             else:
                 sleep_ms(2)
             if self.interface == 'i2c':
@@ -506,3 +511,4 @@ class HuskyLens:
         Unsafe/unknown commands are the caller's responsibility.
         """
         return self._first_response(command, payload)
+
